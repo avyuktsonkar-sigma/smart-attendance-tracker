@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartTrack Pro — Attendance Engine</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    body { background-color: #020617; font-family: system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen p-4 md:p-8">
+
+  <div class="max-w-6xl mx-auto space-y-8">
+    
+    <!-- Top Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+          <i data-lucide="graduation-cap" class="w-7 h-7"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">SmartTrack Pro</h1>
+          <p class="text-slate-400 text-xs md:text-sm">Academic Attendance Forecaster & 75% Rule Engine</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="exportCSV()" class="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-700 hover:border-slate-500 rounded-xl text-sm font-medium transition active:scale-95">
+          <i data-lucide="download" class="w-4 h-4 text-slate-400"></i> Export CSV
+        </button>
+        <button onclick="openModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/30 transition active:scale-95">
+          <i data-lucide="plus" class="w-4 h-4"></i> Add Subject
+        </button>
+      </div>
+    </header>
+
+    <!-- Analytics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+        <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">Overall Aggregate</span>
+        <div class="text-3xl md:text-4xl font-black mt-2 text-white flex items-baseline gap-2">
+          <span id="stat-overall">0%</span>
+          <span id="stat-badge" class="text-xs px-2 py-0.5 rounded-full font-bold">Safe</span>
+        </div>
+        <div class="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+          <div id="stat-progress" class="h-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+        <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">Total Lectures</span>
+        <div id="stat-total" class="text-3xl md:text-4xl font-black mt-2 text-white">0</div>
+        <div class="text-xs text-slate-400 mt-2">Combined across semester</div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+        <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">Attended Lectures</span>
+        <div id="stat-attended" class="text-3xl md:text-4xl font-black mt-2 text-emerald-400">0</div>
+        <div id="stat-missed" class="text-xs text-slate-400 mt-2">0 Missed classes</div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
+        <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">Shortage Warnings</span>
+        <div id="stat-shortage" class="text-3xl md:text-4xl font-black mt-2 text-rose-400">0</div>
+        <div class="text-xs text-slate-400 mt-2">Below 75% target threshold</div>
+      </div>
+    </div>
+
+    <!-- Enrolled Subjects Grid -->
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-200">Enrolled Courses</h2>
+        <span class="text-xs text-slate-400">Click Present (+) or Absent (−) to update live</span>
+      </div>
+      <div id="subjects-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
+
+  </div>
+
+  <!-- Add Subject Modal -->
+  <div id="add-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <h3 class="text-lg font-bold text-white mb-4">Add New Course</h3>
+      <form onsubmit="handleFormSubmit(event)" class="space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-slate-400">Subject Name</label>
+          <input id="sub-name" required placeholder="e.g. Operating Systems" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-400">Course Code</label>
+          <input id="sub-code" placeholder="e.g. CS401" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs font-semibold text-slate-400">Attended</label>
+            <input id="sub-present" type="number" min="0" value="0" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-400">Total Held</label>
+            <input id="sub-total" type="number" min="0" value="0" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-400">Target %</label>
+            <input id="sub-target" type="number" min="1" max="100" value="75" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-3">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold">Save Subject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const INITIAL_DATA = [
+      { id: '1', name: 'Data Structures & Algorithms', code: 'CS301', present: 22, total: 26, target: 75 },
+      { id: '2', name: 'Database Management Systems', code: 'CS302', present: 16, total: 26, target: 75 },
+      { id: '3', name: 'Computer Networks', code: 'CS303', present: 25, total: 28, target: 75 },
+      { id: '4', name: 'Software Engineering', code: 'CS304', present: 12, total: 20, target: 75 }
+    ];
+
+    let subjects = JSON.parse(localStorage.getItem('smart_attendance_data')) || INITIAL_DATA;
+
+    function saveAndRender() {
+      localStorage.setItem('smart_attendance_data', JSON.stringify(subjects));
+      renderStats();
+      renderSubjects();
+      lucide.createIcons();
+    }
+
+    function calculateBunkStatus(present, total, target) {
+      if (total === 0) return { message: 'No classes taken yet', safe: true };
+      const current = (present / total) * 100;
+      const targetDec = target / 100;
+
+      if (current >= target) {
+        const canBunk = Math.floor((present - targetDec * total) / targetDec);
+        return {
+          message: canBunk === 0 ? 'On the margin! Don’t miss next class.' : `Safe to miss next ${canBunk} class${canBunk > 1 ? 'es' : ''}`,
+          safe: true
+        };
+      } else {
+        const mustAttend = Math.ceil((targetDec * total - present) / (1 - targetDec));
+        return {
+          message: `Attend next ${mustAttend} class${mustAttend > 1 ? 'es' : ''} continuously`,
+          safe: false
+        };
+      }
+    }
+
+    function renderStats() {
+      const totalClasses = subjects.reduce((sum, s) => sum + s.total, 0);
+      const totalAttended = subjects.reduce((sum, s) => sum + s.present, 0);
+      const overall = totalClasses === 0 ? 0 : Math.round((totalAttended / totalClasses) * 100);
+      const shortages = subjects.filter(s => s.total > 0 && (s.present / s.total) * 100 < s.target).length;
+
+      document.getElementById('stat-overall').innerText = `${overall}%`;
+      document.getElementById('stat-total').innerText = totalClasses;
+      document.getElementById('stat-attended').innerText = totalAttended;
+      document.getElementById('stat-missed').innerText = `${totalClasses - totalAttended} Missed classes`;
+      document.getElementById('stat-shortage').innerText = shortages;
+
+      const badge = document.getElementById('stat-badge');
+      const progress = document.getElementById('stat-progress');
+      progress.style.width = `${Math.min(overall, 100)}%`;
+
+      if (overall >= 75) {
+        badge.className = 'text-xs px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        badge.innerText = 'Safe';
+        progress.className = 'h-full bg-emerald-500 transition-all duration-500';
+      } else {
+        badge.className = 'text-xs px-2 py-0.5 rounded-full font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30';
+        badge.innerText = 'Critical';
+        progress.className = 'h-full bg-rose-500 transition-all duration-500';
+      }
+    }
+
+    function renderSubjects() {
+      const grid = document.getElementById('subjects-grid');
+      grid.innerHTML = '';
+
+      subjects.forEach(sub => {
+        const pct = sub.total === 0 ? 0 : Math.round((sub.present / sub.total) * 100);
+        const isShortage = pct < sub.target;
+        const status = calculateBunkStatus(sub.present, sub.total, sub.target);
+
+        const card = document.createElement('div');
+        card.className = `border rounded-2xl p-5 flex flex-col justify-between transition ${
+          isShortage ? 'bg-rose-950/20 border-rose-500/30' : 'bg-slate-900/40 border-slate-800'
+        }`;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-start justify-between">
+              <div>
+                <span class="text-[10px] font-bold bg-slate-800 px-2.5 py-0.5 rounded-full text-slate-400 uppercase tracking-wider">${sub.code}</span>
+                <h3 class="text-base md:text-lg font-semibold text-white mt-1.5">${sub.name}</h3>
+              </div>
+              <button onclick="deleteSubject('${sub.id}')" class="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-950/30 transition">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <div class="mt-4 flex items-center justify-between">
+              <div class="text-2xl font-black text-white">
+                ${pct}% 
+                <span class="text-xs font-normal text-slate-400 ml-1">(${sub.present}/${sub.total})</span>
+              </div>
+              <span class="text-xs px-2.5 py-0.5 rounded-full font-bold ${isShortage ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}">
+                Req: ${sub.target}%
+              </span>
+            </div>
+
+            <div class="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+              <div class="h-full ${isShortage ? 'bg-rose-500' : 'bg-emerald-500'} transition-all" style="width: ${Math.min(pct, 100)}%"></div>
+            </div>
+
+            <div class="mt-3.5 text-xs font-medium p-2.5 rounded-xl flex items-center gap-2 ${
+              status.safe ? 'bg-emerald-950/30 text-emerald-300 border border-emerald-900/40' : 'bg-rose-950/40 text-rose-300 border border-rose-900/40'
+            }">
+              <i data-lucide="${status.safe ? 'sparkles' : 'alert-circle'}" class="w-4 h-4 shrink-0"></i>
+              <span>${status.message}</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800/80">
+            <button onclick="markAttendance('${sub.id}', true)" class="flex items-center justify-center gap-1.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl font-semibold text-xs transition active:scale-95">
+              <i data-lucide="check" class="w-4 h-4"></i> Present
+            </button>
+            <button onclick="markAttendance('${sub.id}', false)" class="flex items-center justify-center gap-1.5 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 rounded-xl font-semibold text-xs transition active:scale-95">
+              <i data-lucide="x" class="w-4 h-4"></i> Absent
+            </button>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    function markAttendance(id, isPresent) {
+      subjects = subjects.map(s => {
+        if (s.id !== id) return s;
+        const newP = isPresent ? s.present + 1 : s.present;
+        const newT = s.total + 1;
+        if (isPresent && (newP / newT) * 100 >= s.target && (s.present / s.total) * 100 < s.target) {
+          confetti({ particleCount: 70, spread: 60, origin: { y: 0.8 } });
+        }
+        return { ...s, present: newP, total: newT };
+      });
+      saveAndRender();
+    }
+
+    function deleteSubject(id) {
+      subjects = subjects.filter(s => s.id !== id);
+      saveAndRender();
+    }
+
+    function openModal() {
+      document.getElementById('add-modal').classList.remove('hidden');
+      document.getElementById('add-modal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('add-modal').classList.add('hidden');
+      document.getElementById('add-modal').classList.remove('flex');
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('sub-name').value;
+      const code = document.getElementById('sub-code').value || 'SUB' + (subjects.length + 1);
+      const present = Number(document.getElementById('sub-present').value) || 0;
+      const total = Number(document.getElementById('sub-total').value) || 0;
+      const target = Number(document.getElementById('sub-target').value) || 75;
+
+      subjects.push({ id: Date.now().toString(), name, code, present, total, target });
+      closeModal();
+      document.getElementById('sub-name').value = '';
+      document.getElementById('sub-code').value = '';
+      saveAndRender();
+    }
+
+    function exportCSV() {
+      const headers = ['Course Code,Course Name,Present,Total,Percentage,Target,Status'];
+      const rows = subjects.map(s => {
+        const pct = s.total === 0 ? 0 : ((s.present / s.total) * 100).toFixed(1);
+        const status = Number(pct) >= s.target ? 'Eligible' : 'Shortage';
+        return `"${s.code}","${s.name}",${s.present},${s.total},${pct}%,${s.target}%,${status}`;
+      });
+      const blob = new Blob([[...headers, ...rows].join('\n')], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Attendance_Audit_Report.csv`;
+      a.click();
+    }
+
+    // Initialize
+    saveAndRender();
+  </script>
+</body>
+</html>
