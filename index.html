@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SmartTrack Pro — Attendance Engine</title>
+  <title>SmartTrack Pro — Live Attendance Engine</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
@@ -26,11 +26,14 @@
         </div>
         <div>
           <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">SmartTrack Pro</h1>
-          <p class="text-slate-400 text-xs md:text-sm">Academic Attendance Forecaster & 75% Rule Engine</p>
+          <p class="text-slate-400 text-xs md:text-sm">Academic Attendance Engine & Shortage Forecast</p>
         </div>
       </div>
 
       <div class="flex items-center gap-3">
+        <button onclick="clearAllData()" id="clear-btn" class="hidden items-center gap-1.5 px-3 py-2 bg-rose-950/30 hover:bg-rose-900/50 border border-rose-800/40 text-rose-300 rounded-xl text-xs font-semibold transition active:scale-95">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear All
+        </button>
         <button onclick="exportCSV()" class="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-700 hover:border-slate-500 rounded-xl text-sm font-medium transition active:scale-95">
           <i data-lucide="download" class="w-4 h-4 text-slate-400"></i> Export CSV
         </button>
@@ -40,23 +43,23 @@
       </div>
     </header>
 
-    <!-- Analytics Cards -->
+    <!-- Analytics Dashboard Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
       <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
         <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">Overall Aggregate</span>
         <div class="text-3xl md:text-4xl font-black mt-2 text-white flex items-baseline gap-2">
           <span id="stat-overall">0%</span>
-          <span id="stat-badge" class="text-xs px-2 py-0.5 rounded-full font-bold">Safe</span>
+          <span id="stat-badge" class="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-400">No Data</span>
         </div>
         <div class="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
-          <div id="stat-progress" class="h-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+          <div id="stat-progress" class="h-full bg-indigo-500 transition-all duration-500" style="width: 0%"></div>
         </div>
       </div>
 
       <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
         <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">Total Lectures</span>
         <div id="stat-total" class="text-3xl md:text-4xl font-black mt-2 text-white">0</div>
-        <div class="text-xs text-slate-400 mt-2">Combined across semester</div>
+        <div class="text-xs text-slate-400 mt-2">Held across semester</div>
       </div>
 
       <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
@@ -76,7 +79,7 @@
     <div class="space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-bold text-slate-200">Enrolled Courses</h2>
-        <span class="text-xs text-slate-400">Click Present (+) or Absent (−) to update live</span>
+        <span id="helper-text" class="text-xs text-slate-400 hidden">Click Present (+) or Absent (−) to update live</span>
       </div>
       <div id="subjects-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
     </div>
@@ -86,15 +89,15 @@
   <!-- Add Subject Modal -->
   <div id="add-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-      <h3 class="text-lg font-bold text-white mb-4">Add New Course</h3>
+      <h3 class="text-lg font-bold text-white mb-4">Add Course / Subject</h3>
       <form onsubmit="handleFormSubmit(event)" class="space-y-4">
         <div>
-          <label class="text-xs font-semibold text-slate-400">Subject Name</label>
-          <input id="sub-name" required placeholder="e.g. Operating Systems" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+          <label class="text-xs font-semibold text-slate-400">Subject Name <span class="text-rose-400">*</span></label>
+          <input id="sub-name" required placeholder="e.g. Computer Networks" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
         </div>
         <div>
-          <label class="text-xs font-semibold text-slate-400">Course Code</label>
-          <input id="sub-code" placeholder="e.g. CS401" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+          <label class="text-xs font-semibold text-slate-400">Course Code (Optional)</label>
+          <input id="sub-code" placeholder="e.g. CS302" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
         </div>
         <div class="grid grid-cols-3 gap-3">
           <div>
@@ -112,44 +115,39 @@
         </div>
         <div class="flex justify-end gap-2 pt-3">
           <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold">Save Subject</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold">Save Course</button>
         </div>
       </form>
     </div>
   </div>
 
   <script>
-    const INITIAL_DATA = [
-      { id: '1', name: 'Data Structures & Algorithms', code: 'CS301', present: 22, total: 26, target: 75 },
-      { id: '2', name: 'Database Management Systems', code: 'CS302', present: 16, total: 26, target: 75 },
-      { id: '3', name: 'Computer Networks', code: 'CS303', present: 25, total: 28, target: 75 },
-      { id: '4', name: 'Software Engineering', code: 'CS304', present: 12, total: 20, target: 75 }
-    ];
-
-    let subjects = JSON.parse(localStorage.getItem('smart_attendance_data')) || INITIAL_DATA;
+    // Completely blank initial data (Zero pre-written courses)
+    const STORAGE_KEY = 'smart_track_fresh_data_v2';
+    let subjects = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
 
     function saveAndRender() {
-      localStorage.setItem('smart_attendance_data', JSON.stringify(subjects));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(subjects));
       renderStats();
       renderSubjects();
       lucide.createIcons();
     }
 
     function calculateBunkStatus(present, total, target) {
-      if (total === 0) return { message: 'No classes taken yet', safe: true };
+      if (total === 0) return { message: 'No lectures held yet. Attend all to stay safe!', safe: true };
       const current = (present / total) * 100;
       const targetDec = target / 100;
 
       if (current >= target) {
         const canBunk = Math.floor((present - targetDec * total) / targetDec);
         return {
-          message: canBunk === 0 ? 'On the margin! Don’t miss next class.' : `Safe to miss next ${canBunk} class${canBunk > 1 ? 'es' : ''}`,
+          message: canBunk === 0 ? 'On the borderline! Do not miss next lecture.' : `Safe to miss next ${canBunk} lecture${canBunk > 1 ? 's' : ''}`,
           safe: true
         };
       } else {
         const mustAttend = Math.ceil((targetDec * total - present) / (1 - targetDec));
         return {
-          message: `Attend next ${mustAttend} class${mustAttend > 1 ? 'es' : ''} continuously`,
+          message: `Must attend next ${mustAttend} class${mustAttend > 1 ? 'es' : ''} back-to-back`,
           safe: false
         };
       }
@@ -169,6 +167,22 @@
 
       const badge = document.getElementById('stat-badge');
       const progress = document.getElementById('stat-progress');
+      const clearBtn = document.getElementById('clear-btn');
+      const helperText = document.getElementById('helper-text');
+
+      if (subjects.length === 0) {
+        badge.className = 'text-xs px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-400';
+        badge.innerText = 'No Data';
+        progress.style.width = '0%';
+        clearBtn.classList.add('hidden');
+        clearBtn.classList.remove('flex');
+        helperText.classList.add('hidden');
+        return;
+      }
+
+      clearBtn.classList.remove('hidden');
+      clearBtn.classList.add('flex');
+      helperText.classList.remove('hidden');
       progress.style.width = `${Math.min(overall, 100)}%`;
 
       if (overall >= 75) {
@@ -186,9 +200,27 @@
       const grid = document.getElementById('subjects-grid');
       grid.innerHTML = '';
 
+      // Professional Empty State (when user has zero subjects)
+      if (subjects.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full py-16 text-center border-2 border-dashed border-slate-800/80 rounded-3xl p-8 bg-slate-900/20">
+            <div class="inline-flex p-4 bg-indigo-500/10 text-indigo-400 rounded-2xl mb-4 border border-indigo-500/20">
+              <i data-lucide="book-open-check" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white">No Courses Added Yet</h3>
+            <p class="text-slate-400 text-sm max-w-sm mx-auto mt-1.5 mb-6">Start tracking your semester by adding your first subject, attendance counts, and target cutoff percentage.</p>
+            <button onclick="openModal()" class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition active:scale-95 shadow-lg shadow-indigo-600/30">
+              <i data-lucide="plus" class="w-4 h-4"></i> Add Your First Course
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      // Render cards if subjects exist
       subjects.forEach(sub => {
         const pct = sub.total === 0 ? 0 : Math.round((sub.present / sub.total) * 100);
-        const isShortage = pct < sub.target;
+        const isShortage = sub.total > 0 && pct < sub.target;
         const status = calculateBunkStatus(sub.present, sub.total, sub.target);
 
         const card = document.createElement('div');
@@ -249,8 +281,8 @@
         if (s.id !== id) return s;
         const newP = isPresent ? s.present + 1 : s.present;
         const newT = s.total + 1;
-        if (isPresent && (newP / newT) * 100 >= s.target && (s.present / s.total) * 100 < s.target) {
-          confetti({ particleCount: 70, spread: 60, origin: { y: 0.8 } });
+        if (isPresent && s.total > 0 && (newP / newT) * 100 >= s.target && (s.present / s.total) * 100 < s.target) {
+          confetti({ particleCount: 75, spread: 60, origin: { y: 0.8 } });
         }
         return { ...s, present: newP, total: newT };
       });
@@ -260,6 +292,13 @@
     function deleteSubject(id) {
       subjects = subjects.filter(s => s.id !== id);
       saveAndRender();
+    }
+
+    function clearAllData() {
+      if (confirm('Are you sure you want to delete all courses and reset the tracker?')) {
+        subjects = [];
+        saveAndRender();
+      }
     }
 
     function openModal() {
@@ -284,10 +323,16 @@
       closeModal();
       document.getElementById('sub-name').value = '';
       document.getElementById('sub-code').value = '';
+      document.getElementById('sub-present').value = '0';
+      document.getElementById('sub-total').value = '0';
       saveAndRender();
     }
 
     function exportCSV() {
+      if (subjects.length === 0) {
+        alert('Please add at least one subject before exporting report.');
+        return;
+      }
       const headers = ['Course Code,Course Name,Present,Total,Percentage,Target,Status'];
       const rows = subjects.map(s => {
         const pct = s.total === 0 ? 0 : ((s.present / s.total) * 100).toFixed(1);
@@ -302,7 +347,7 @@
       a.click();
     }
 
-    // Initialize
+    // Initialize clean view
     saveAndRender();
   </script>
 </body>
